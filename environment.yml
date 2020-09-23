@@ -1,0 +1,11 @@
+name: tf-distribute-explorer
+dependencies:
+    - python=3.7
+    - pip
+    - requests
+    - ipython
+    - jupyter
+    - numpy=1.18.*
+    - scipy==1.4.*
+    - pip:
+        - tensorflow-gpu==2.3.*
