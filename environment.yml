@@ -7,5 +7,6 @@ dependencies:
     - jupyter
     - numpy=1.18.*
     - scipy==1.4.*
+    - sympy
     - pip:
         - tensorflow-gpu==2.3.*
