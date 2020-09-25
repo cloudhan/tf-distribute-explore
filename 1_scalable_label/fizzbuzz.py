@@ -47,7 +47,7 @@ w_h = init_weights([fbe.num_input_digits, NUM_HIDDEN])
 w_o = init_weights([NUM_HIDDEN, fbe.num_output_classes])
 
 BATCH_SIZE = 128
-NUM_EPOCHES = 10
+NUM_EPOCHES = 10000
 
 lr = tf.keras.optimizers.schedules.PiecewiseConstantDecay([2000, 5000], [0.5, 0.1, 0.01])
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
@@ -68,5 +68,5 @@ for epoch in range(NUM_EPOCHES):
 numbers = np.arange(1, MAX_NUMBER)
 test_X = np.transpose(fbe.binary_encode(numbers)).astype(np.float32)
 test_Y = model_pred(test_X, w_h, w_o)
-output = np.vectorize(fizz_buzz)(numbers, test_Y)
-print(output)
+output = np.vectorize(fbe.decode)(numbers, test_Y)
+print(list(output))

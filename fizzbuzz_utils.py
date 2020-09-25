@@ -112,3 +112,12 @@ if __name__ == "__main__":
     assert fbe.decode(21, 5) == "FizzWhizz"
     assert fbe.decode(35, 6) == "BuzzWhizz"
     assert fbe.decode(105, 7) == "FizzBuzzWhizz"
+
+    fbe = FizzBuzzExtended(max_number=200, num_words=4)
+    assert fbe.decode(0, 1) == "Fizz"
+    assert fbe.decode(0, 2) == "Buzz"
+    assert fbe.decode(0, 4) == "Whizz"
+    assert fbe.decode(0, 8) == "Rizzz"
+    assert fbe.decode(0, 3) == "FizzBuzz"
+    assert fbe.decode(0, 7) == "FizzBuzzWhizz"
+    assert fbe.decode(0, 15) == "FizzBuzzWhizzRizzz"
