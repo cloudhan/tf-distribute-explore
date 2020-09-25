@@ -8,7 +8,7 @@ def _num_primes(num_classes):
 
 class FizzBuzzExtended:
 
-    # Onomatopoeia words from http://onomatopoeialist.com/
+    # onomatopoeic words from http://onomatopoeialist.com/
     words = ["Fizz", "Buzz", "Whizz", "Rizzz", "Zzzz", "Hiss",
              "Burr", "Chirr", "Purr", "Whirr", "Aha", "Blah",
              "Duh", "Huh", "Shuh", "Crow", "Meow", "Neow", "Yeow",
@@ -23,20 +23,29 @@ class FizzBuzzExtended:
 
         sieve.extend_to_no(num_words + 1) # 2 is omited
         self._primes = sieve._list[1:2+num_words]
-        self._num_digit = num_words
+        self._num_input_digits = int(math.log2(max_number - 1) + 1)
+        self._num_output_digits = num_words
 
     @property
-    def num_classes(self):
+    def num_input_digits(self):
+        return self._num_input_digits
+
+    @property
+    def num_output_digits(self):
+        return self._num_output_digits
+
+    @property
+    def num_output_classes(self):
         return self._num_classes
-
-    @property
-    def num_digit(self):
-        return self._num_digit
 
     def binary_encode(self, number):
         """For neural network input"""
-        assert 0<=number<0x7FFFFFFF, "should be int32"
-        return np.array([number >> d & 1 for d in range(self._num_digits)], dtype=np.uint8)
+        if isinstance(number, np.ndarray):
+            assert (number>=0).all() and (number<=0x7FFFFFFF).all(), "should be in range 0<=number<0x7FFFFFFF"
+        else:
+            assert 0<=number<=0x7FFFFFFF, "should be in range 0<=number<0x7FFFFFFF"
+
+        return np.array([number >> d & 1 for d in range(self._num_input_digits)], dtype=np.uint8)
 
     def sparse_encode(self, number):
         """For neural network label, but for using in sparse_softmax_cross_entropy_with_logits"""
@@ -44,7 +53,8 @@ class FizzBuzzExtended:
         if number == 0:
             return 0
         ret = 0
-        for i, p in enumerate(self._primes):
+        for i in range(self._num_output_digits):
+            p = self._primes[i]
             ret |= ((number % p) == 0) << i
         return ret
 
@@ -53,15 +63,17 @@ class FizzBuzzExtended:
         if class_index == 0:
             return str(number)
         else:
-            ret = [FizzBuzzExtended.words[i] for i in range(self._num_digit) if (class_index >> i) & 1]
+            ret = [FizzBuzzExtended.words[i] for i in range(self._num_output_digits) if (class_index >> i) & 1]
             return "".join(ret)
 
 
 
 if __name__ == "__main__":
-    fbe = FizzBuzzExtended(max_number=100, num_words=2)
-    assert fbe.num_classes == 4
-    assert fbe.num_digit == 2
+    fbe = FizzBuzzExtended(max_number=120, num_words=2)
+    assert fbe.num_output_classes == 4
+    assert fbe.num_input_digits == 7 # 0~127
+    assert fbe.num_output_digits == 2
+    assert (fbe.binary_encode(0) == np.array([0,0,0,0,0,0,0])).all()
     assert fbe.sparse_encode(0) == 0
     assert fbe.sparse_encode(1) == 0
     assert fbe.sparse_encode(2) == 0
@@ -70,14 +82,16 @@ if __name__ == "__main__":
     assert fbe.sparse_encode(5) == 2
     assert fbe.sparse_encode(6) == 1
     assert fbe.sparse_encode(15) == 3
+    assert fbe.sparse_encode(105) == 3
     assert fbe.decode(11, 0) == "11"
     assert fbe.decode(3, 1) == "Fizz"
     assert fbe.decode(5, 2) == "Buzz"
     assert fbe.decode(14, 3) == "FizzBuzz"
 
     fbe = FizzBuzzExtended(max_number=200, num_words=3)
-    assert fbe.num_classes == 8
-    assert fbe.num_digit == 3
+    assert fbe.num_output_classes == 8
+    assert fbe.num_input_digits == 8 # 0~255
+    assert fbe.num_output_digits == 3
     assert fbe.sparse_encode(1) == 0
     assert fbe.sparse_encode(3) == 1
     assert fbe.sparse_encode(5) == 2
