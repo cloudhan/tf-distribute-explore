@@ -2,9 +2,6 @@ import math
 import numpy as np
 from sympy import sieve
 
-def _num_primes(num_classes):
-    assert num_classes >= 2
-    return int(math.floor(math.log2(num_classes - 1)) + 1)
 
 class FizzBuzzExtended:
 

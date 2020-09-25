@@ -3,7 +3,6 @@ import tensorflow as tf
 
 from fizzbuzz_utils import FizzBuzzExtended
 
-# @tf.function
 def init_weights(shape):
     return tf.Variable(tf.random.normal(shape, stddev=0.01))
 
@@ -37,11 +36,10 @@ MAX_NUMBER = 2000
 NUM_WORDS = 4
 fbe = FizzBuzzExtended(MAX_NUMBER, NUM_WORDS)
 
-# Whatsoever, let's cheat with dataset. My goal is to explore tf.distribute capability.
+# Let's overfitting it!
 trX = np.array([fbe.binary_encode(i) for i in range(MAX_NUMBER)]).astype(np.float32)
 trY = np.array([fbe.sparse_encode(i) for i in range(MAX_NUMBER)]).astype(np.int64)
 
-# Initialize the weights.
 NUM_HIDDEN = 200
 w_h = init_weights([fbe.num_input_digits, NUM_HIDDEN])
 w_o = init_weights([NUM_HIDDEN, fbe.num_output_classes])
@@ -53,16 +51,13 @@ lr = tf.keras.optimizers.schedules.PiecewiseConstantDecay([2000, 5000], [0.5, 0.
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
 
 for epoch in range(NUM_EPOCHES):
-    # Shuffle the data before each training iteration.
     p = np.random.permutation(range(len(trX)))
     trX, trY = trX[p], trY[p]
 
-    # Train with batches.
     for start in range(0, len(trX), BATCH_SIZE):
         end = start + BATCH_SIZE
         l = train_step(optimizer, trX[start:end], w_h, w_o, trY[start:end])
 
-    # And print the current accuracy on the training data.
     print(epoch, np.mean(trY == model_pred(trX, w_h, w_o)))
 
 numbers = np.arange(1, MAX_NUMBER)
