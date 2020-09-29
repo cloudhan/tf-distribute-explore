@@ -64,8 +64,9 @@ def train_step(optimizer, X, w_h, w_o, Y):
         v = strategy.reduce(tf.distribute.ReduceOp.MEAN, dist_v, axis=None)
         return v
 
-    # NOTE: this is unnecessarily complicated way to do all reduction...
-    #   just for demonstration purpose
+    # NOTE: this is unnecessarily complicated way to do all reduction, just for demonstration purpose.
+    # NOTE: tf.keras.optimizers.Optimizer.apply_gradients will automatic do this for us (again),
+    #   but mean all_reduce mean grads are still original mean grads anyway ;)
     mean_grads = ctx.merge_call(merge_fn, args=(grads,))
     optimizer.apply_gradients(zip(mean_grads, [w_h, w_o]))
     return l
