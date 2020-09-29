@@ -43,11 +43,31 @@ def loss(Y, pred):
 
 @tf.function
 def train_step(optimizer, X, w_h, w_o, Y):
+    # NOTE: in mirrored strategy scope, with replica ctx
+    assert not tf.distribute.in_cross_replica_context(), "We should be in replica context"
+
     with tf.GradientTape() as tape:
         prob = model(X, w_h, w_o)
         l = loss(Y, prob)
     grads = tape.gradient(l, [w_h, w_o])
-    optimizer.apply_gradients(zip(grads, [w_h, w_o]))
+
+    ctx = tf.distribute.get_replica_context()
+    # NOTE: these grads are PerReplica values
+    # tf.print("Replica id:", ctx.replica_id_in_sync_group, "of", ctx.num_replicas_in_sync)
+    # tf.print(grads)
+
+    @tf.function
+    def merge_fn(strategy, dist_v):
+        # NOTE: with merge_call, we enter the cross replica ctx again
+        assert tf.distribute.in_cross_replica_context()
+        # tf.print(strategy) # NOTE: print shows we are in the MirroredStrategy
+        v = strategy.reduce(tf.distribute.ReduceOp.MEAN, dist_v, axis=None)
+        return v
+
+    # NOTE: this is unnecessarily complicated way to do all reduction...
+    #   just for demonstration purpose
+    mean_grads = ctx.merge_call(merge_fn, args=(grads,))
+    optimizer.apply_gradients(zip(mean_grads, [w_h, w_o]))
     return l
 
 
@@ -57,52 +77,44 @@ fbe = FizzBuzzExtended(args.max_number, args.num_words)
 trX = np.array([fbe.binary_encode(i) for i in range(args.max_number)]).astype(np.float32)
 trY = np.array([fbe.sparse_encode(i) for i in range(args.max_number)]).astype(np.int64)
 
-ds = tf.data.Dataset.from_tensor_slices({"data": trX, "label": trY})
+ds = tf.data.Dataset.from_tensor_slices({"data": trX, "label": trY}).cache()
 ds = ds.batch(args.batchsize, drop_remainder=True)
 
 # dp means data parallel
 dp = tf.distribute.MirroredStrategy(devices=tf.config.list_logical_devices("GPU"))
 print ('Number of devices: {}'.format(dp.num_replicas_in_sync))
 
-@tf.function
-def print_in_ctx(v):
-    ctx = tf.distribute.get_replica_context()
-    print(ctx)
-    if ctx:
-        print(dir(ctx))
-        print("Value:", ctx.replica_id_in_sync_group, v)
-        with ctx:
-            print(v)
-    else:
-        print("ctx is None!")
 
+# NOTE: no strategy scope is entered, we are in the default single replica ctx
 with dp.scope():
+    # NOTE: in mirrored strategy scope, with cross replica ctx
+    assert tf.distribute.in_cross_replica_context(), "We should be in cross replica context"
+
     NUM_HIDDEN = 200
+    # NOTE: we create tf.Variable, thus, we are in scope
     w_h = init_weights([fbe.num_input_digits, NUM_HIDDEN])
     w_o = init_weights([NUM_HIDDEN, fbe.num_output_classes])
 
-    dp.experimental_split_to_logical_devices
-    # NOTE: tf.Variable is distribute strategy aware
+    lr = tf.keras.optimizers.schedules.PiecewiseConstantDecay([2000, 5000], [0.5, 0.1, 0.01])
+    # NOTE: models, optimizers, metrics might create tf.Variable, so they should be in scope
+    optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
 
-    print_in_ctx(w_h)
-    dp.run(print_in_ctx, args=(w_h,))
-
-
-exit()
-
-lr = tf.keras.optimizers.schedules.PiecewiseConstantDecay([2000, 5000], [0.5, 0.1, 0.01])
-optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+    dist_ds = dp.experimental_distribute_dataset(ds)
 
 
 for epoch in range(args.num_epoches):
-    p = np.random.permutation(range(len(trX)))
-    trX, trY = trX[p], trY[p]
+    # NOTE: the distributed dataset iterator returns PerReplica DistributedValues
+    #   thus, it can be used as input of strategy.run
+    # for batch in dist_ds:
+    #     print(batch)
+    #     exit()
 
-    for batch in ds:
-        l = train_step(optimizer, batch["data"], w_h, w_o, batch["label"])
+    for batch in dist_ds:
+        dist_loss = dp.run(train_step, args=(optimizer, batch["data"], w_h, w_o, batch["label"]))
 
     print(epoch, np.mean(trY == model_pred(trX, w_h, w_o)))
-    exit()
+    # exit()
+
 
 numbers = np.arange(1, args.max_number)
 test_X = np.transpose(fbe.binary_encode(numbers)).astype(np.float32)
