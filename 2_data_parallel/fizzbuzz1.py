@@ -24,14 +24,13 @@ def init_weights(shape):
 @tf.function
 def model(X, w_h, w_o):
     h = tf.nn.relu(tf.matmul(X, w_h))
-    prob = tf.matmul(h, w_o)
-    return prob
+    output = tf.matmul(h, w_o)
+    return output
 
 
 @tf.function
 def model_pred(X, w_h, w_o):
-    prob = model(X, w_h, w_o)
-    return tf.argmax(input=prob, axis=1)
+    return tf.argmax(input=model(X, w_h, w_o), axis=1)
 
 
 @tf.function
@@ -47,8 +46,8 @@ def train_step(optimizer, X, w_h, w_o, Y):
     assert not tf.distribute.in_cross_replica_context(), "We should be in replica context"
 
     with tf.GradientTape() as tape:
-        prob = model(X, w_h, w_o)
-        l = loss(Y, prob)
+        o = model(X, w_h, w_o)
+        l = loss(Y, o)
     grads = tape.gradient(l, [w_h, w_o])
 
     ctx = tf.distribute.get_replica_context()

@@ -36,13 +36,20 @@ class FizzBuzzExtended:
         return self._num_classes
 
     def binary_encode(self, number):
-        """For neural network input"""
+        """For neural network input. Binary little endian."""
         if isinstance(number, np.ndarray):
             assert (number>=0).all() and (number<=0x7FFFFFFF).all(), "should be in range 0<=number<0x7FFFFFFF"
         else:
             assert 0<=number<=0x7FFFFFFF, "should be in range 0<=number<0x7FFFFFFF"
 
         return np.array([number >> d & 1 for d in range(self._num_input_digits)], dtype=np.uint8)
+
+    def binary_decode(self, v):
+        assert self._num_input_digits == len(v)
+        number = 0
+        for i, n in enumerate(v):
+            number += (1 << i) * int(n)
+        return number
 
     def sparse_encode(self, number):
         """For neural network label, but for using in sparse_softmax_cross_entropy_with_logits"""
@@ -71,6 +78,11 @@ if __name__ == "__main__":
     assert fbe.num_input_digits == 7 # 0~127
     assert fbe.num_output_digits == 2
     assert (fbe.binary_encode(0) == np.array([0,0,0,0,0,0,0])).all()
+    assert (fbe.binary_encode(3) == np.array([1,1,0,0,0,0,0])).all()
+    assert fbe.binary_decode(fbe.binary_encode(3)) == 3
+    assert fbe.binary_decode(fbe.binary_encode(5)) == 5
+    assert fbe.binary_decode(fbe.binary_encode(11)) == 11
+    assert fbe.binary_decode(fbe.binary_encode(31)) == 31
     assert fbe.sparse_encode(0) == 0
     assert fbe.sparse_encode(1) == 0
     assert fbe.sparse_encode(2) == 0
