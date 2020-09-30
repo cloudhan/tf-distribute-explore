@@ -59,6 +59,7 @@ def train_loop(dataset, optimizer, w_h, w_o, epoch_loss):
     for batch in dataset:
         num_steps += 1.0
         l = strategy.run(train_step, args=(optimizer, batch["data"], w_h, w_o, batch["label"]))
+        # it sucks that we cannot capture value `l` here
         # strategy.run(lambda: epoch_loss.assign_add(l))
         strategy.run(lambda acc, v: acc.assign_add(v), args=(epoch_loss, l))
 
