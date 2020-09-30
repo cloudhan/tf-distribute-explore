@@ -1,5 +1,5 @@
 # Code copied from https://github.com/joelgrus/fizz-buzz-tensorflow/blob/master/fizz_buzz.py
-# minor modification is maed for working with tensorflow 2.2
+# minor modification is made for working with tensorflow 2.2
 
 # Fizz Buzz in Tensorflow!
 # see http://joelgrus.com/2016/05/23/fizz-buzz-in-tensorflow/
