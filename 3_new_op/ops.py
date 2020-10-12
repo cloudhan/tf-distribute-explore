@@ -79,7 +79,9 @@ if __name__ == "__main__":
     print("grad diff:", ref_grads[0] - my_grads[0])
 
     # so the diff is small enough, we are good for now!
-    # the problem remains here is:
+    # The problem remains here is:
+    #   This op still runs on a single device
+    # We need to figure out:
     #   How do we
     #   INCORPORATE custom op/function, which have custom gradient (function),
     #   WITH custom distribute strategy (replication of computation).
