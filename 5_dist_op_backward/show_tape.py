@@ -67,3 +67,6 @@ mono_grad_m, mono_grad_v = tape.gradient(mono_result, [mono_m, mono_v])
 print(tf.reduce_sum(tf.abs(dist_result - mono_result)))
 print(tf.reduce_sum(tf.abs(dist_grad_m - mono_grad_m)))
 print(tf.reduce_sum(tf.abs(dist_grad_v - mono_grad_v)))
+
+# So the diff is small enough!
+# And I have all the ingredients to build TF2 native large scale model parallel distributed training task.
