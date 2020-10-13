@@ -2,9 +2,6 @@ import tensorflow as tf
 from tensorflow.python.distribute.collective_all_reduce_strategy import CollectiveAllReduceStrategy
 
 cc = CollectiveAllReduceStrategy()
-
-
-
 shape = (10, 10)
 
 def create_value(ctx):
@@ -19,12 +16,12 @@ with cc.scope():
 
 @tf.function
 def run():
-    def pmatrix_mul_mvector(m, v):
+    def step(m, v):
         ctx = tf.distribute.get_replica_context()
         assert ctx is not None
         return tf.matmul(m, v)
 
-    return cc.run(pmatrix_mul_mvector, args=(m, v))
+    return cc.run(step, args=(m, v))
 
 
 dist_result = tf.concat(run().values, axis=0)
