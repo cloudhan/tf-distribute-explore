@@ -9,5 +9,6 @@ dependencies:
     - scipy==1.4.*
     - sympy
     - colorama
+    - pytest
     - pip:
         - tensorflow-gpu==2.3.*
