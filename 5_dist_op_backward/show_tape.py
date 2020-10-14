@@ -4,6 +4,25 @@ from tensorflow.python.distribute.collective_all_reduce_strategy import Collecti
 cc = CollectiveAllReduceStrategy()
 shape = (10, 10)
 
+# define the op
+@tf.custom_gradient
+def pmatrix_mul_mvector(m, v):
+    """partitioned matrix multiply mirrored vector"""
+
+    def forward(m, v):
+        tf.stop_gradient(m)
+        tf.stop_gradient(v)
+        return tf.matmul(m, v)
+
+    def grad_fn(input_grad):
+        grad_m = tf.repeat(tf.transpose(v), axis=0, repeats=m.shape[0])
+        grad_v = tf.matmul(tf.transpose(m), input_grad)
+        ctx = tf.distribute.get_replica_context()
+        grad_v = ctx.all_reduce(tf.distribute.ReduceOp.SUM, grad_v)
+        return grad_m, grad_v
+
+    return forward(m, v), grad_fn
+
 
 def create_value(ctx):
     return tf.Variable(tf.random.normal(shape=shape))
@@ -14,40 +33,26 @@ with cc.scope():
     # NOTE: only variable is controlled by strategy
     v = tf.Variable(tf.random.normal((10, 1)))
 
-
+# build graph
 @tf.function
 def run():
-    @tf.custom_gradient
-    def pmatrix_mul_mvector_op(m, v):
-        """partitioned matrix multiply mirrored vector"""
-
-        def forward(m, v):
-            tf.stop_gradient(m)
-            tf.stop_gradient(v)
-            return tf.matmul(m, v)
-
-        def grad_fn(input_grad):
-            grad_m = tf.repeat(tf.transpose(v), axis=0, repeats=m.shape[0])
-            grad_v = tf.matmul(tf.transpose(m), input_grad)
-            ctx = tf.distribute.get_replica_context()
-            grad_v = ctx.all_reduce(tf.distribute.ReduceOp.SUM, grad_v)
-            return grad_m, grad_v
-
-        return forward(m, v), grad_fn
-
+    # the actual computation to be replicated, we could have put tf.function
+    # decorator here, but there is a bug for tf.function to take as input a
+    # PerReplica tf.Variable.
     def step(m, v):
         ctx = tf.distribute.get_replica_context()
         assert ctx is not None
         with tf.GradientTape() as tape:
             tape.watch(m)
             tape.watch(v)
-            ret = pmatrix_mul_mvector_op(m, v)
+            ret = pmatrix_mul_mvector(m, v)
 
         grads = tape.gradient(ret, [m, v])
 
         return ret, grads
 
     return cc.run(step, args=(m, v))
+
 
 result, (grad_m, grad_v) = run()
 
