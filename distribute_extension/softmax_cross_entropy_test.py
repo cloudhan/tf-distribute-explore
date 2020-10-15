@@ -1,7 +1,9 @@
 import pytest
 import tensorflow as tf
-from .device_utils import limit_to_virtual_gpus
-from .softmax_cross_entropy import softmax_cross_entropy_with_logits
+
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from device_utils import limit_to_virtual_gpus
+from softmax_cross_entropy import softmax_cross_entropy_with_logits
 
 
 @pytest.mark.parametrize("batchsize, num_class_pr", zip([23, 32, 64, 128], [4, 8, 25, 250]))
@@ -47,3 +49,6 @@ def test_softmax_cross_entropy_with_logits(batchsize, num_class_pr):
     my_grad = tf.concat(my_grad.values, axis=1)
     backward_diff = ref_grad - my_grad
     assert tf.reduce_max(tf.abs(backward_diff)) < 1e-7
+
+if __name__ == "__main__":
+    test_softmax_cross_entropy_with_logits(32, 4)
