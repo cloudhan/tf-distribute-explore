@@ -5,6 +5,7 @@ _VIRTUAL_GPUS = None
 def limit_to_virtual_gpus(num_vgpus=4):
     global _VIRTUAL_GPUS
     if _VIRTUAL_GPUS is not None:
+        assert len(_VIRTUAL_GPUS) == num_vgpus
         return _VIRTUAL_GPUS
     else:
         gpus = tf.config.list_physical_devices(device_type="GPU")

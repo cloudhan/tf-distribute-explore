@@ -78,6 +78,6 @@ def softmax_cross_entropy_with_logits(logits, labels):
     def grad_fn(grad):
         # gradient of softmax cross entropy is particularly simple:
         # -(label - prob)
-        return (e_to_the_xi / sum_global) - labels_onehot_local, None
+        return ((e_to_the_xi / sum_global) - labels_onehot_local) * tf.expand_dims(grad, axis=-1), None
 
     return loss_global, grad_fn

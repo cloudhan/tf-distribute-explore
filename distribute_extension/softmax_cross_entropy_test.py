@@ -1,54 +1,57 @@
 import pytest
 import tensorflow as tf
 
-import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from device_utils import limit_to_virtual_gpus
 from softmax_cross_entropy import softmax_cross_entropy_with_logits
 
 
-@pytest.mark.parametrize("batchsize, num_class_pr", zip([23, 32, 64, 128], [4, 8, 25, 250]))
+@pytest.mark.parametrize("batchsize, num_class_pr", zip([23, 32, 64, 128, 256], [4, 8, 25, 250, 25000]))
 def test_softmax_cross_entropy_with_logits(batchsize, num_class_pr):
     gpus = limit_to_virtual_gpus()
     dp = tf.distribute.MirroredStrategy(devices=gpus)
     num_replica = dp.num_replicas_in_sync
 
+    coeff = tf.random.uniform(shape=(batchsize,)) + 1
+
     logits = tf.range(batchsize * num_class_pr * num_replica, dtype=tf.float32)
-    logits_partitioned = tf.reshape(logits, shape=(batchsize, num_replica, num_class_pr))
-    logits_partitioned = dp.experimental_distribute_values_from_function(
-        lambda ctx: logits_partitioned[:, ctx.replica_id_in_sync_group, :]
-    )
     logits = tf.reshape(logits, shape=(batchsize, -1))
-
     labels = tf.math.mod(tf.range(batchsize), num_class_pr * num_replica)
-
-    with dp.scope():
-        labels_mirrored = tf.Variable(labels)
 
     with tf.GradientTape() as tape:
         tape.watch(logits)
         ref = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=labels)
-    (ref_grad,) = tape.gradient(ref, [logits])
+        loss = coeff * ref
+    (ref_grad,) = tape.gradient(loss, [logits])
+
+    logits = tf.reshape(logits, shape=(batchsize, num_replica, num_class_pr))
+    logits = dp.experimental_distribute_values_from_function(lambda ctx: logits[:, ctx.replica_id_in_sync_group, :])
+    coeff = dp.experimental_distribute_values_from_function(lambda ctx: coeff)
+
+    with dp.scope():
+        labels = tf.Variable(labels)
 
     # NOTE: softmax_cross_entropy_with_logits is not a tf.function, the bug will
     # not be triggered. for simplicity here, we will not wrap the whole
     # computation in a tf.function.
-    def forward_backward(logits, labels):  # def step(...):
+    def forward_backward(logits, labels, coeff):  # def step(...):
         with tf.GradientTape() as tape:
             tape.watch(logits)
-            ret = softmax_cross_entropy_with_logits(logits, labels)
+            my = softmax_cross_entropy_with_logits(logits, labels)
+            loss = coeff * my
 
         assert tf.distribute.get_replica_context() is not None
-        (grad,) = tape.gradient(ret, [logits])
-        return ret, grad
+        (grad,) = tape.gradient(loss, [logits])
+        return my, grad
 
-    my, my_grad = dp.run(forward_backward, args=(logits_partitioned, labels_mirrored))
-
-    forward_diff = ref - my.values[0]
-    assert tf.reduce_max(tf.abs(forward_diff)) < 1e-7
+    my, my_grad = dp.run(forward_backward, args=(logits, labels, coeff))
+    assert tf.reduce_max(tf.abs(ref - my.values[0])) < 1e-6
 
     my_grad = tf.concat(my_grad.values, axis=1)
-    backward_diff = ref_grad - my_grad
-    assert tf.reduce_max(tf.abs(backward_diff)) < 1e-7
+    assert tf.reduce_max(tf.abs(ref_grad - my_grad)) < 1e-6
+
 
 if __name__ == "__main__":
     test_softmax_cross_entropy_with_logits(32, 4)
