@@ -1,5 +1,4 @@
 import tensorflow as tf
-from device_utils import limit_to_virtual_gpus
 
 
 @tf.custom_gradient

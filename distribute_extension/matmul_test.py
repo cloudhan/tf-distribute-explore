@@ -16,7 +16,6 @@ mnk = [
 @pytest.mark.parametrize("m, n, k", mnk)
 def test_matmul_mp(m, n, k):
     gpus = limit_to_virtual_gpus()
-    # gpus = tf.config.list_logical_devices("GPU")
     dp = tf.distribute.MirroredStrategy(devices=gpus, cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
     num_replica = dp.num_replicas_in_sync
 
