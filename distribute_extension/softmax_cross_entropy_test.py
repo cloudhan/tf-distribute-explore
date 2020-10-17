@@ -11,7 +11,7 @@ from softmax_cross_entropy import softmax_cross_entropy_with_logits
 @pytest.mark.parametrize("batchsize, num_class_pr", zip([23, 32, 64, 128, 256], [4, 8, 25, 250, 25000]))
 def test_softmax_cross_entropy_with_logits(batchsize, num_class_pr):
     gpus = limit_to_virtual_gpus()
-    dp = tf.distribute.MirroredStrategy(devices=gpus)
+    dp = tf.distribute.MirroredStrategy(devices=gpus, cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
     num_replica = dp.num_replicas_in_sync
 
     coeff = tf.random.uniform(shape=(batchsize,)) + 1

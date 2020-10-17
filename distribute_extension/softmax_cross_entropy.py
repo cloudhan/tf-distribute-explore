@@ -48,16 +48,14 @@ def softmax_cross_entropy_with_logits(logits, labels):
         labels_onehot_local = tf.cast(labels, dtype=tf.float32)
     elif labels.shape.rank == 1:
         tf.assert_equal(tf.shape(labels), batch_size)
-        labels_onehot_local = tf.one_hot(
-            labels - num_classes_local * ctx.replica_id_in_sync_group, depth=num_classes_local, dtype=tf.float32
-        )
+        tmp = labels - tf.cast(num_classes_local * ctx.replica_id_in_sync_group, dtype=labels.dtype)
+        labels_onehot_local = tf.one_hot(tmp, depth=num_classes_local, dtype=tf.float32)
     else:
         raise RuntimeError("wrong label rank")
 
     # NOTE: collective communication library's reduce ops are for reducing gradients, The reduction involves large amount of data
     #   exchange. xCCL implement special communication algorithms, to avoid routing thoes data over channels with small bandwidth.
     #   e.g. they first reduce locally and then globally.
-    # Our data exchange is small, so not using it makes no problem.
 
     logits_no_grad = tf.stop_gradient(logits)
     max_local = tf.reduce_max(logits_no_grad, axis=1, keepdims=True)
@@ -66,14 +64,16 @@ def softmax_cross_entropy_with_logits(logits, labels):
 
     e_to_the_xi = tf.math.exp(logits_shifted)
     sum_local = tf.reduce_sum(e_to_the_xi, axis=1, keepdims=True)
-    sum_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(sum_local,))
+    # sum_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(sum_local,))
+    sum_global = ctx.all_reduce(tf.distribute.ReduceOp.SUM, sum_local)
 
     # this is log prob, prob in [0, 1], log prob in (-inf, 0]
     pred_local = logits_shifted - tf.math.log(sum_global)
     pred_local = tf.clip_by_value(pred_local, -1e35, 0.0)
 
     loss_local = tf.reduce_sum(-labels_onehot_local * pred_local, axis=-1)
-    loss_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(loss_local,))
+    # loss_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(loss_local,))
+    loss_global = ctx.all_reduce(tf.distribute.ReduceOp.SUM, loss_local)
 
     def grad_fn(grad):
         # gradient of softmax cross entropy is particularly simple:
