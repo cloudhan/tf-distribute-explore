@@ -1,2 +1,2 @@
-from .matmul import matmul_mp
+from .matmul import matmul_mp, matmul_mp_with_merge
 from .softmax_cross_entropy import softmax_cross_entropy_with_logits

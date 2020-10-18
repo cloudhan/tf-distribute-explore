@@ -40,3 +40,27 @@ def matmul_mp(M, P):
         return grad_M, grad_P
 
     return tf.matmul(M, P), grad_fn
+
+
+@tf.custom_gradient
+def matmul_mp_with_merge(M, P):
+    """Merge M before computing"""
+    M = tf.stop_gradient(M)
+    P = tf.stop_gradient(P)
+    orig_shape = tuple(M.shape)
+
+    ctx = tf.distribute.get_replica_context()
+    M = ctx.merge_call(lambda _, v: tf.concat(v.values, axis=0), args=(M,))
+    result = tf.matmul(M, P)
+
+    def grad_fn(grad):
+        ctx = tf.distribute.get_replica_context()
+
+        grad_M = tf.matmul(grad, tf.transpose(P))
+        grad_M = ctx.all_reduce(tf.distribute.ReduceOp.SUM, grad_M)
+        grad_M = tf.slice(grad_M, (ctx.replica_id_in_sync_group * orig_shape[0] , 0), orig_shape)
+
+        grad_P = tf.matmul(tf.transpose(M), grad)
+        return grad_M, grad_P
+
+    return result, grad_fn
