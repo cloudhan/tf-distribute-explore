@@ -42,14 +42,16 @@ def test_softmax_cross_entropy_with_logits(batchsize, num_class_pr):
             my = softmax_cross_entropy_with_logits(logits, labels)
             loss = coeff * my
 
-        assert tf.distribute.get_replica_context() is not None
         (grad,) = tape.gradient(loss, [logits])
         return my, grad
 
     my, my_grad = dp.run(forward_backward, args=(logits, labels, coeff))
-    assert tf.reduce_max(tf.abs(ref - my.values[0])) < 1e-6
-
     my_grad = tf.concat(my_grad.values, axis=1)
+
+    assert ref.shape == my.values[0].shape
+    assert ref_grad.shape == my_grad.shape
+
+    assert tf.reduce_max(tf.abs(ref - my.values[0])) < 1e-6
     assert tf.reduce_max(tf.abs(ref_grad - my_grad)) < 1e-6
 
 

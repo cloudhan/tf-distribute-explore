@@ -64,7 +64,6 @@ def softmax_cross_entropy_with_logits(logits, labels):
 
     e_to_the_xi = tf.math.exp(logits_shifted)
     sum_local = tf.reduce_sum(e_to_the_xi, axis=1, keepdims=True)
-    # sum_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(sum_local,))
     sum_global = ctx.all_reduce(tf.distribute.ReduceOp.SUM, sum_local)
 
     # this is log prob, prob in [0, 1], log prob in (-inf, 0]
@@ -72,7 +71,6 @@ def softmax_cross_entropy_with_logits(logits, labels):
     pred_local = tf.clip_by_value(pred_local, -1e35, 0.0)
 
     loss_local = tf.reduce_sum(-labels_onehot_local * pred_local, axis=-1)
-    # loss_global = ctx.merge_call(lambda _, v: tf.reduce_sum(v.values, axis=0), args=(loss_local,))
     loss_global = ctx.all_reduce(tf.distribute.ReduceOp.SUM, loss_local)
 
     def grad_fn(grad):
