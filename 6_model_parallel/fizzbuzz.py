@@ -87,12 +87,14 @@ class FizzBuzz:
         with tf.GradientTape(persistent=True) as tape:
             o = FizzBuzz.forward(X, w_h, w_o)
             l = FizzBuzz.loss(Y, o)
-        grad_w_h = tape.gradient(l, w_h)
         grad_w_o = tape.gradient(l, w_o)
-        optimizer.apply_gradients(zip([grad_w_h], [w_h]))
+        grad_w_h = tape.gradient(l, w_h)
 
         lr = optimizer._decayed_lr(tf.float32)
         w_o.assign_add(-lr * grad_w_o)
+
+        optimizer.apply_gradients(zip([grad_w_h], [w_h]))
+
         return l
 
     @tf.function
