@@ -3,15 +3,15 @@ import tensorflow as tf
 
 @tf.custom_gradient
 def softmax_cross_entropy_with_logits(logits, labels):
-    """An Operator computes softmax loss partitioned on multiple devices.
+    """An operator computes softmax loss partitioned on multiple devices.
     Assuming they are equally partitioned.
 
     Args:
         logits: PerReplica of Tensor (a.k.a, partitioned), e.g., If we have
-            a PerReplica Value (with 4 replica) of Tensors be of shape
+            a PerReplica Value (with 4 replica) of Tensors, which are of shape
             128 * 250_000. Then batchsize is 128, and we are doing 1 million
-            classes classification (250000 * 4 replicas), with each replica
-            handles only 250000 classes. This is called model parallelism.
+            classes classification (250_000 * 4 replicas), with each replica
+            handles only 250_000 classes. This is called model parallelism.
         labels: MirroredVariable of Tensor
 
     Note:
@@ -53,9 +53,11 @@ def softmax_cross_entropy_with_logits(logits, labels):
     else:
         raise RuntimeError("wrong label rank")
 
-    # NOTE: collective communication library's reduce ops are for reducing gradients, The reduction involves large amount of data
-    #   exchange. xCCL implement special communication algorithms, to avoid routing thoes data over channels with small bandwidth.
-    #   e.g. they first reduce locally and then globally.
+    # NOTE: collective communication library's reduce ops are for reducing
+    #   gradients, The reduction involves large amount of data exchange. xCCL
+    #   (nccl, oneCCL, etc) implements special communication algorithms, to
+    #   avoid routing thoes data over channels with small bandwidth. e.g. they
+    #   first reduce locally and then globally.
 
     logits_no_grad = tf.stop_gradient(logits)
     max_local = tf.reduce_max(logits_no_grad, axis=1, keepdims=True)

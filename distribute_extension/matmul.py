@@ -5,8 +5,9 @@ import tensorflow as tf
 def matmul_mp(M, P):
     """Partitioned Matrix Multiplication.
 
-    The `_pm` suffix means the first matrix is partitioned, along the last
-    dimension and the second matrix is mirrored.
+    The `_mp` suffix means:
+        a) the first matrix is mirrored.
+        b) the second matrix is partitioned along the last dimension
 
     $$
     M P = M \begin{bmatrix}P_1 & P_2 & \cdots \end{bmatrix}
@@ -19,7 +20,7 @@ def matmul_mp(M, P):
 
     If we view matrix M as of shape [batchsize, input_feature_dim] and matrix P
     as of shape [input_feature_dim, output_feature dim], then the computation
-    will be reduced to different devices and the result will be spreaded. This
+    will be carried on different devices and the result will be spreaded. This
     let us do large matrix multiplication with lots of "small" compute unit,
     instead of being constrained to a huge computer (HPC).
 
