@@ -84,18 +84,17 @@ class FizzBuzz:
         ctx = tf.distribute.get_replica_context()
         Y = ctx.merge_call(lambda _, v: tf.concat(v.values, axis=0), args=(Y,))
 
-        with tf.GradientTape(persistent=True) as tape:
-            o = FizzBuzz.forward(X, w_h, w_o)
-            l = FizzBuzz.loss(Y, o)
-        grad_w_o = tape.gradient(l, w_o)
-        grad_w_h = tape.gradient(l, w_h)
+        with tf.GradientTape() as tape:
+            loss = FizzBuzz.loss(Y, FizzBuzz.forward(X, w_h, w_o))
+        grads = tape.gradient(loss, [w_h, w_o])
+        grad_w_h, grad_w_o = grads
 
         lr = optimizer._decayed_lr(tf.float32)
         w_o.assign_add(-lr * grad_w_o)
 
         optimizer.apply_gradients(zip([grad_w_h], [w_h]))
 
-        return l
+        return loss
 
     @tf.function
     def run_train_step(self, X, Y):
